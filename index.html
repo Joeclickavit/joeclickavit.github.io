@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DeviantArt Sniper</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; background: #f4f4f4; }
+        #box { background: white; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #05cc47; color: white; border: none; border-radius: 4px; }
+        button:disabled { background: #ccc; }
+        #status { color: #555; margin: 15px 0; font-weight: bold; }
+        #result { margin-top: 20px; padding: 15px; border: 2px solid #05cc47; border-radius: 5px; display: none; }
+        a { font-size: 24px; color: #05cc47; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="box">
+        <h1>DeviantArt Sniper</h1>
+        <p>Targeting active usernames...</p>
+        <hr>
+
+        <div id="status">Ready!</div>
+        <button id="runBtn" onclick="startHunt()">Start Snipe</button>
+
+        <div id="result">
+            <p><strong>Account Found!</strong></p>
+            <a id="user-link" href="#" target="_blank">---</a>
+            <p><small>Click name to view</small></p>
+        </div>
+    </div>
+
+    <script>
+        async function startHunt() {
+            const btn = document.getElementById('runBtn');
+            const status = document.getElementById('status');
+            const resultBox = document.getElementById('result');
+            const userLink = document.getElementById('user-link');
+
+            btn.disabled = true;
+            resultBox.style.display = "none";
+            status.innerText = "Searching...";
+
+            try {
+                // Get words from Wikipedia
+                const wikiApi = "https://en.wikipedia.org/w/api.php?action=query&list=random&rnnamespace=0&rnlimit=15&format=json&origin=*";
+                const response = await fetch(wikiApi);
+                const data = await response.json();
+                
+                let candidate = "";
+                for (let item of data.query.random) {
+                    let clean = item.title.replace(/[^a-zA-Z]/g, ""); 
+                    if (clean.length >= 3 && clean.length <= 10) {
+                        candidate = clean;
+                        break;
+                    }
+                }
+
+                if (candidate) {
+                    status.innerText = "Checking: " + candidate;
+
+                    const img = new Image();
+                    img.onload = function() {
+                        status.innerText = "Success!";
+                        userLink.innerText = candidate;
+                        userLink.href = "https://www.deviantart.com/" + candidate;
+                        resultBox.style.display = "block";
+                        btn.disabled = false;
+                    };
+
+                    img.onerror = function() {
+                        status.innerText = "Skipping...";
+                        setTimeout(startHunt, 50); 
+                    };
+
+                    // Check if the user has an avatar on DA's servers
+                    img.src = "https://a.deviantart.net/avatars/" + 
+                              candidate[0].toLowerCase() + "/" + 
+                              candidate[1].toLowerCase() + "/" + 
+                              candidate.toLowerCase() + ".jpg";
+                } else {
+                    status.innerText = "Reloading...";
+                    setTimeout(startHunt, 50);
+                }
+
+            } catch (err) {
+                status.innerText = "Offline?";
+                btn.disabled = false;
+            }
+        }
+    </script>
+
+</body>
+</html>
