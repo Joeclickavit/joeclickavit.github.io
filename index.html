@@ -1,93 +1,149 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>DeviantArt Sniper</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; background: #f4f4f4; }
-        #box { background: white; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #05cc47; color: white; border: none; border-radius: 4px; }
-        button:disabled { background: #ccc; }
-        #status { color: #555; margin: 15px 0; font-weight: bold; }
-        #result { margin-top: 20px; padding: 15px; border: 2px solid #05cc47; border-radius: 5px; display: none; }
-        a { font-size: 24px; color: #05cc47; text-decoration: none; font-weight: bold; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070b1f">
+<title>Astro Mobile Access</title>
+<style>
+:root { --bg: #070b1f; --card: #101739; --line: #2a3570; --text: #eef1ff; --dim: #9aa5d8; --accent: #7c9bff; --accent2: #c18bff; --bad: #ff7a7a; color-scheme: dark; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body {
+  min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background-image: radial-gradient(ellipse at 50% -10%, rgba(124,155,255,.25), transparent 60%), radial-gradient(circle at 85% 90%, rgba(193,139,255,.15), transparent 50%);
+}
+main { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 22px; text-align: center; }
+.logo { font-size: 54px; line-height: 1; filter: drop-shadow(0 0 18px rgba(124,155,255,.6)); }
+h1 { margin: 0; font-size: 28px; letter-spacing: .01em; }
+.sub { margin: 6px 0 0; color: var(--dim); font-size: 16px; }
+.btns { display: flex; flex-direction: column; gap: 14px; }
+.svc { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 76px; padding: 14px 18px; text-align: left; font: inherit; color: var(--text); background: var(--card); border: 2px solid var(--line); border-radius: 18px; cursor: pointer; transition: transform .1s, border-color .15s; }
+.svc:active { transform: scale(.98); border-color: var(--accent); }
+.svc[disabled] { opacity: .55; cursor: wait; }
+.svc .ic { font-size: 30px; flex: none; width: 44px; text-align: center; }
+.svc b { display: block; font-size: 19px; }
+.svc small { display: block; color: var(--dim); font-size: 14px; margin-top: 2px; }
+.svc .go { margin-left: auto; color: var(--accent); font-size: 26px; flex: none; }
+.svc.loading .go { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .svc.loading .go { animation: none; } .svc { transition: none; } }
+#status { min-height: 44px; font-size: 15px; color: var(--dim); }
+#status.err { color: var(--bad); }
+#retry { display: none; margin-top: 8px; font: inherit; color: var(--text); background: transparent; border: 2px solid var(--accent); border-radius: 12px; padding: 8px 18px; min-height: 40px; cursor: pointer; }
+.fine { color: var(--dim); font-size: 13px; opacity: .8; }
+button:focus-visible { outline: 3px solid var(--accent2); outline-offset: 2px; }
+</style>
 </head>
 <body>
+<main>
+  <div>
+    <div class="logo" aria-hidden="true">&#128640;</div>
+    <h1>Astro Mobile Access</h1>
+    <p class="sub">Access Astro Services on Mobile</p>
+  </div>
 
-    <div id="box">
-        <h1>DeviantArt Sniper</h1>
-        <p>Targeting active usernames...</p>
-        <hr>
+  <div class="btns">
+    <button type="button" class="svc" data-svc="messages">
+      <span class="ic" aria-hidden="true">&#128172;</span>
+      <span><b>Messages</b><small>Chat, groups and calls</small></span>
+      <span class="go" aria-hidden="true">&rsaquo;</span>
+    </button>
+    <button type="button" class="svc" data-svc="forums">
+      <span class="ic" aria-hidden="true">&#128421;</span>
+      <span><b>Vee-Forums</b><small>Boards, threads and replies</small></span>
+      <span class="go" aria-hidden="true">&rsaquo;</span>
+    </button>
+  </div>
 
-        <div id="status">Ready!</div>
-        <button id="runBtn" onclick="startHunt()">Start Snipe</button>
+  <div id="status" role="status" aria-live="polite">
+    <span id="status-text">Pick a service to open it.</span><br>
+    <button type="button" id="retry">Try again</button>
+  </div>
+  <div class="fine">Loaded through jsDelivr</div>
+</main>
 
-        <div id="result">
-            <p><strong>Account Found!</strong></p>
-            <a id="user-link" href="#" target="_blank">---</a>
-            <p><small>Click name to view</small></p>
-        </div>
-    </div>
+<script>
+(function () {
+  // Each service is a file on GitHub, served through jsDelivr.
+  var SERVICES = {
+    messages: { name: 'Messages',    path: 'Joeclickavit/MessagesMobile@main/Messages-mobile-only.html' },
+    forums:   { name: 'Vee-Forums',  path: 'Joeclickavit/VeeForumMobile@main/index.html' }
+  };
+  // jsDelivr mirrors, tried in order if one is blocked or down.
+  var HOSTS = ['https://cdn.jsdelivr.net/gh/', 'https://fastly.jsdelivr.net/gh/', 'https://gcore.jsdelivr.net/gh/'];
+  var TIMEOUT_MS = 20000;
 
-    <script>
-        async function startHunt() {
-            const btn = document.getElementById('runBtn');
-            const status = document.getElementById('status');
-            const resultBox = document.getElementById('result');
-            const userLink = document.getElementById('user-link');
+  var statusText = document.getElementById('status-text');
+  var statusBox = document.getElementById('status');
+  var retry = document.getElementById('retry');
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('.svc'));
+  var current = null, busy = false;
 
-            btn.disabled = true;
-            resultBox.style.display = "none";
-            status.innerText = "Searching...";
+  function say(msg, isErr) {
+    statusText.textContent = msg;
+    statusBox.className = isErr ? 'err' : '';
+    retry.style.display = isErr ? 'inline-block' : 'none';
+  }
+  function setBusy(on, key) {
+    busy = on;
+    buttons.forEach(function (b) {
+      b.disabled = on;
+      b.classList.toggle('loading', on && b.getAttribute('data-svc') === key);
+    });
+  }
 
-            try {
-                // Get words from Wikipedia
-                const wikiApi = "https://en.wikipedia.org/w/api.php?action=query&list=random&rnnamespace=0&rnlimit=15&format=json&origin=*";
-                const response = await fetch(wikiApi);
-                const data = await response.json();
-                
-                let candidate = "";
-                for (let item of data.query.random) {
-                    let clean = item.title.replace(/[^a-zA-Z]/g, ""); 
-                    if (clean.length >= 3 && clean.length <= 10) {
-                        candidate = clean;
-                        break;
-                    }
-                }
+  function fetchText(url) {
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, TIMEOUT_MS);
+    return fetch(url, { signal: ctl.signal, cache: 'no-cache' }).then(function (r) {
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }, function (e) { clearTimeout(timer); throw e; });
+  }
 
-                if (candidate) {
-                    status.innerText = "Checking: " + candidate;
+  function fetchService(svc) {
+    var i = 0, lastErr = null;
+    function next() {
+      if (i >= HOSTS.length) return Promise.reject(lastErr || new Error('No mirror worked'));
+      var url = HOSTS[i++] + svc.path;
+      return fetchText(url).then(function (html) {
+        if (!/<html|<!doctype|<body|<script/i.test(html)) throw new Error('Unexpected response');
+        return html;
+      }).catch(function (e) { lastErr = e; return next(); });
+    }
+    return next();
+  }
 
-                    const img = new Image();
-                    img.onload = function() {
-                        status.innerText = "Success!";
-                        userLink.innerText = candidate;
-                        userLink.href = "https://www.deviantart.com/" + candidate;
-                        resultBox.style.display = "block";
-                        btn.disabled = false;
-                    };
+  // jsDelivr serves .html as plain text, so the page is fetched and written in
+  // place of this loader instead of being navigated to.
+  function launch(key) {
+    var svc = SERVICES[key];
+    if (!svc || busy) return;
+    current = key;
+    setBusy(true, key);
+    say('Loading ' + svc.name + '...');
+    fetchService(svc).then(function (html) {
+      document.open();
+      document.write(html);
+      document.close();
+    }).catch(function (e) {
+      setBusy(false);
+      say('Could not load ' + svc.name + '. Check your connection and try again.' + (e && e.message ? ' (' + e.message + ')' : ''), true);
+    });
+  }
 
-                    img.onerror = function() {
-                        status.innerText = "Skipping...";
-                        setTimeout(startHunt, 50); 
-                    };
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () { launch(b.getAttribute('data-svc')); });
+  });
+  retry.addEventListener('click', function () { if (current) launch(current); });
 
-                    // Check if the user has an avatar on DA's servers
-                    img.src = "https://a.deviantart.net/avatars/" + 
-                              candidate[0].toLowerCase() + "/" + 
-                              candidate[1].toLowerCase() + "/" + 
-                              candidate.toLowerCase() + ".jpg";
-                } else {
-                    status.innerText = "Reloading...";
-                    setTimeout(startHunt, 50);
-                }
-
-            } catch (err) {
-                status.innerText = "Offline?";
-                btn.disabled = false;
-            }
-        }
-    </script>
-
+  // Optional shortcuts: ...Astro-Mobile-Access.html#messages or #forums
+  var h = (location.hash || '').replace('#', '').toLowerCase();
+  if (SERVICES[h]) launch(h);
+})();
+</script>
 </body>
 </html>
